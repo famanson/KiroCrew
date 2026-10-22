@@ -53,16 +53,19 @@ class TestAcpIdCorrection:
         assert acp_id_correction("global.anthropic.claude-opus-4-8[1m]") == "claude-opus-4.8"
 
     def test_every_registered_claude_code_id_is_correctable(self):
-        """Class-level guard: no registered non-acp id may bypass the correction.
+        """Class-level guard: no id whose row has a kiro id may bypass the correction.
 
         Pins the rule rather than the three instances above, so a registry entry
         added later cannot reintroduce the bypass silently.
         """
-        from kiro_crew.model_registry import available_models
+        from kiro_crew.model_registry import available_models, from_provider_id, to_acp_id
 
         served = set(available_models("acp"))
         for pid in available_models("claude_code"):
             if pid in served:
+                continue
+            # Such a row has no kiro id to correct to.
+            if not to_acp_id(from_provider_id(pid, "claude_code")):
                 continue
             assert acp_id_correction(pid), f"{pid!r} bypassed the correction"
 
@@ -307,6 +310,18 @@ class TestNoRedundantConfigLoad:
 
         assert reason is not None
         assert "registry maps that spelling to 'claude-opus-4.5'" in reason
+
+    @pytest.mark.parametrize(
+        "spelling, target",
+        [("claude-opus-5-5", "claude-opus-5.5"), ("claude-sonnet-5-5", "claude-sonnet-5.5")],
+    )
+    def test_correction_lists_the_id_it_maps_to(self, spelling, target):
+        from kiro_crew.dashboard.handlers import agents
+
+        reason = agents._model_pin_rejected(spelling, SimpleNamespace(app={}), provider="acp")
+
+        assert reason is not None
+        assert target in reason.split("pick one of: ", 1)[1].split(", ")
 
     def test_claude_code_provider_keeps_its_wire_id(self, monkeypatch):
         from kiro_crew.dashboard.handlers import agents, core

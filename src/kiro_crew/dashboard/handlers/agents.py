@@ -1824,7 +1824,7 @@ def _model_pin_rejected(
         # plausible-intent user into a quieter capability change than the one
         # they asked for. Report the mapping, show what is actually served, and
         # let them choose.
-        served = ", ".join(model_registry.available_models("acp")[:8]) or "auto"
+        served = ", ".join(model_registry.available_models("acp")) or "auto"
         return (
             f"{model!r} is not a model kiro-cli serves. The registry maps that "
             f"spelling to {correction!r} — confirm that is the model you want, or "
