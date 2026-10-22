@@ -1800,7 +1800,8 @@ def _model_pin_rejected(
     per-role validator so the crew form, the role pins and the session-init
     withhold apply one predicate. ``""``/``"auto"`` mean inherit and always
     pass; an unknown advertised set means entitlement is unknowable, and the
-    validator accepts rather than accusing on no evidence.
+    validator accepts, except a pin on an ``acp``-namespace backend that
+    ``lacks_acp_id`` flags.
     """
     # The retained claude_code seam accepts canonical and registered Bedrock
     # wire ids that the ACP correction and advertised-id comparison below

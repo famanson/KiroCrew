@@ -918,3 +918,21 @@ class TestClaude55Rows:
     @pytest.mark.parametrize("key, aliases, pid, acp_id, wire", _CLAUDE_5X_ROWS, ids=_CLAUDE_5X_IDS)
     def test_to_acp_id_gives_the_kiro_dotted_id_or_none(self, key, aliases, pid, acp_id, wire):
         assert mr.to_acp_id(key) == acp_id
+
+    @pytest.mark.parametrize(
+        "pin",
+        [
+            "claude-fable-5.1",
+            "claude-fable-5-1",
+            "claude-fable-5-1[1m]",
+            "global.anthropic.claude-fable-5-1[1m]",
+        ],
+    )
+    def test_every_fable_5_1_spelling_lacks_an_acp_id(self, pin):
+        assert mr.lacks_acp_id(pin) is True
+
+    @pytest.mark.parametrize(
+        "pin", ["claude-opus-4.8", "claude-opus-5-5", "auto", "", "not-a-registered-model"]
+    )
+    def test_a_kiro_served_row_auto_or_an_unknown_id_does_not_lack_one(self, pin):
+        assert mr.lacks_acp_id(pin) is False

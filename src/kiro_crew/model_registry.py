@@ -876,6 +876,12 @@ def registered_model_key(model_id: str) -> str | None:
     return None
 
 
+def lacks_acp_id(model_id: str) -> bool:
+    """True when *model_id* names a registered row other than ``auto`` with no kiro-cli id."""
+    key = registered_model_key(model_id)
+    return key is not None and key != "auto" and not _REGISTRY[key].get("providers", {}).get("acp")
+
+
 def same_registered_model(a: str, b: str) -> bool:
     """False only when the registry knows BOTH ids and says they are different models.
 
