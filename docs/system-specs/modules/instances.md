@@ -1371,7 +1371,11 @@ when it names an executable file, `exec`s it, so mint uses the same venv as the
 live gateway. The snippet probes three data homes in priority order, since the
 remote's non-interactive SSH shell usually does not export `KIROCREW_HOME`:
 
-1. `$KIROCREW_HOME` when set and non-empty,
+1. `$KIROCREW_HOME` when set and non-empty; else, when
+   `$HOME/<CONFIG_DIR_NAME>/run/gateway-<port>.home` names a data home holding
+   the port's marker and an executable launcher (lines one and two), the snippet
+   runs that launcher with `KIROCREW_HOME` set to that home. The pointed marker
+   only gates liveness and is never read or run, and neither line is eval'd,
 2. `$HOME/<CONFIG_DIR_NAME>` (the current default, `.kiro/crew`),
 3. `$HOME/<LEGACY_CONFIG_DIR_NAME>` (`.kirocrew`, for a not-yet-migrated remote).
 
@@ -1388,9 +1392,10 @@ home (a second gateway on `KIROCREW_HOME=~/.kiro/crew-wrapped`), so outside a po
 such a gateway also writes `gateway-<port>.home`, naming its data home and its
 launcher, into the default run dir when that dir already exists. A source-tree
 launch has no launcher, so it writes an empty launcher line, which mint ignores.
-With no default run dir there is no pointer, which is logged. In both cases mint
-behaves as it does without a pointer. A default-home gateway removes the pointer
-for its own port, and a clean stop removes it when it still names the stopping
+With no default run dir there is no pointer, which is logged (sandbox priming
+creates it; see security.md). In both cases mint behaves as it does without a
+pointer. A default-home gateway removes the pointer for its own port, and a
+clean stop removes it when it still names the stopping
 gateway's home. A gateway writes or removes the pointer only when it published a
 listener covering `127.0.0.1` on that port (that address or `0.0.0.0`), mint's
 IPv4 target; otherwise it leaves the pointer alone and logs the skip at boot.
@@ -1425,8 +1430,11 @@ Known limits of the pointer:
   wait holds it, and so can an agent that holds the readable lock file.
 - A data-home path containing a newline is not supported by the two-line pointer.
 
-`restart_remote()` resolves `kirocrew restart` through the same path, keyed by
-the instance's `remote_port`.
+`restart_remote()` and the remote update (`kirocrew update`, then `restart`)
+resolve their verbs through the same path, pointer included, keyed by the
+instance's `remote_port`, over SSH and SSM alike (`_run_remote_subcommand`).
+The pointer branch runs `restart --port <port>`, because a bare `restart`
+restarts the default home's service unit.
 
 The launcher path is derived from `sys.executable`'s sibling console script
 (`kirocrew`, or `kirocrew.exe` on Windows) and is deliberately **not** resolved
