@@ -1369,7 +1369,11 @@ when it names an executable file, `exec`s it, so mint uses the same venv as the
 live gateway. The snippet probes three data homes in priority order, since the
 remote's non-interactive SSH shell usually does not export `KIROCREW_HOME`:
 
-1. `$KIROCREW_HOME` when set and non-empty,
+1. `$KIROCREW_HOME` when set and non-empty; else, when
+   `$HOME/<CONFIG_DIR_NAME>/run/gateway-<port>.home` names a data home holding
+   the port's marker and an executable launcher (lines one and two), the snippet
+   runs that launcher with `KIROCREW_HOME` set to that home. The pointed marker
+   only gates liveness and is never read or run, and neither line is eval'd,
 2. `$HOME/<CONFIG_DIR_NAME>` (the current default, `.kiro/crew`),
 3. `$HOME/<LEGACY_CONFIG_DIR_NAME>` (`.kirocrew`, for a not-yet-migrated remote).
 
@@ -1421,8 +1425,9 @@ Known limits of the pointer:
   removes it), and that gateway has no pointer until its next boot.
 - A data-home path containing a newline is not supported by the two-line pointer.
 
-`restart_remote()` resolves `kirocrew restart` through the same path, keyed by
-the instance's `remote_port`.
+`restart_remote()` and the remote update (`kirocrew update`, then `restart`)
+resolve their verbs through the same path, pointer included, keyed by the
+instance's `remote_port`, over SSH and SSM alike (`_run_remote_subcommand`).
 
 The launcher path is derived from `sys.executable`'s sibling console script
 (`kirocrew`, or `kirocrew.exe` on Windows) and is deliberately **not** resolved
