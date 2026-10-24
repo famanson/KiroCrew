@@ -127,9 +127,10 @@ jobs:
           # gh_retry convention pr-readiness.yml adopted for the same failure
           # mode (#2753). stderr is deliberately NOT discarded, so a failing
           # query says why.
+          # 75s of backoff outlasts harden-runner refusing a dropped api.github.com IP for one DNS TTL.
           gh_read() {
             local attempt rc=1 out
-            for attempt in 1 2 3; do
+            for attempt in 1 2 3 4 5; do
               if out="$("$@")"; then
                 printf '%s' "$out"
                 return 0
@@ -139,9 +140,9 @@ jobs:
                 # else branch -- that would report a failed query as success.
                 rc=$?
               fi
-              if [ "$attempt" -lt 3 ]; then
+              if [ "$attempt" -lt 5 ]; then
                 echo "resolver query attempt $attempt failed; retrying" >&2
-                sleep $((attempt * 5))
+                sleep $((5 << (attempt - 1)))
               fi
             done
             return "$rc"
@@ -176,7 +177,7 @@ jobs:
                            and ($ref  == "" or .head.ref  == $ref))
                   | .number) // empty
               ')"; then
-            echo "::error::could not query open PRs while resolving $head_sha - the query itself failed on all 3 attempts; see the errors above"
+            echo "::error::could not query open PRs while resolving $head_sha - the query itself failed on all 5 attempts; see the errors above"
             exit 1
           fi
           if [ -z "$pr" ]; then
@@ -186,7 +187,7 @@ jobs:
 
           # Authoritative base SHA straight from the PR (NOT from the artifact).
           if ! base_sha="$(gh_read gh api "repos/$REPO/pulls/$pr" --jq '.base.sha')"; then
-            echo "::error::could not read base.sha for PR #$pr - the query itself failed on all 3 attempts; see the errors above"
+            echo "::error::could not read base.sha for PR #$pr - the query itself failed on all 5 attempts; see the errors above"
             exit 1
           fi
           if [ -z "$base_sha" ] || [ "$base_sha" = "null" ]; then
@@ -375,9 +376,10 @@ jobs:
           # three-dot range from BASE_SHA gave on a full clone.
           compare_base() { gh api "repos/$REPO/compare/$1...$2?per_page=1" --jq '.merge_base_commit.sha'; }
           merge_base=""
-          for attempt in 1 2 3; do
+          # 75s of backoff outlasts harden-runner refusing a dropped api.github.com IP for one DNS TTL.
+          for attempt in 1 2 3 4 5; do
             merge_base="$(compare_base "$BASE_SHA" "$HEAD_SHA")" && break
-            sleep "$attempt"
+            if [ "$attempt" -lt 5 ]; then sleep $((5 << (attempt - 1))); fi
           done
           if ! [[ "$merge_base" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::could not read the merge-base of $BASE_SHA and $HEAD_SHA; failing closed."
