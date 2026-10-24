@@ -13,12 +13,17 @@ from pathlib import Path
 import pytest
 import yaml
 from ai_review_workflows_helpers import (
+    DROPPED_IP_ERROR,
+    DROPPED_IP_WINDOW,
     FORK_REVIEW_LANES,
     _bash,
     _child_env,
     _concurrency_group,
+    _dropped_ip_stubs,
     _flat,
     _proc_log,
+    _shell_function,
+    _slept,
     _step_env,
     _step_script,
     _stub_path,
@@ -497,6 +502,59 @@ FORK_FINALIZE_LANES = (
     "fork-design-review.yml",
     "fork-ux-review.yml",
 )
+
+
+class TestForkResolverReadsRideOutADroppedIp:
+    """harden-runner drops an IP api.github.com resolves to for about one DNS TTL."""
+
+    _RETRY_SLEEPS = [5, 10, 20, 40]
+
+    def _gh_read(
+        self, tmp_path: Path, lane: str, *, window: int
+    ) -> subprocess.CompletedProcess[str]:
+        bash = _bash()
+        if bash is None:
+            pytest.skip("the resolver step is Bash; skip where Bash is absent")
+        _dropped_ip_stubs(tmp_path, "echo answer", window=window)
+        script = _step_script(
+            _workflow(lane), "Resolve and validate PR (authoritative from GitHub)"
+        )
+        return subprocess.run(
+            [
+                bash,
+                "-e",
+                "-o",
+                "pipefail",
+                "-c",
+                _shell_function(script, "gh_read") + "\ngh_read gh api repos/x/y/pulls\n",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=_child_env({"PATH": _stub_path(tmp_path)}),
+            cwd=tmp_path,
+        )
+
+    @pytest.mark.parametrize("lane", FORK_STAGE2_WORKFLOW_RUN_LANES)
+    def test_resolver_read_outlasts_a_dropped_ip_for_one_dns_ttl(
+        self, lane: str, tmp_path: Path
+    ) -> None:
+        result = self._gh_read(tmp_path, lane, window=DROPPED_IP_WINDOW)
+
+        assert result.returncode == 0, _proc_log(result)
+        assert result.stdout == "answer"
+        assert _slept(tmp_path) == self._RETRY_SLEEPS
+
+    @pytest.mark.parametrize("lane", FORK_STAGE2_WORKFLOW_RUN_LANES)
+    def test_resolver_read_that_never_recovers_fails_closed_after_the_same_waits(
+        self, lane: str, tmp_path: Path
+    ) -> None:
+        result = self._gh_read(tmp_path, lane, window=10**9)
+
+        assert result.returncode != 0, _proc_log(result)
+        assert DROPPED_IP_ERROR in result.stderr
+        assert _slept(tmp_path) == self._RETRY_SLEEPS
 
 
 class TestForkLaneFinalizeRetries:
