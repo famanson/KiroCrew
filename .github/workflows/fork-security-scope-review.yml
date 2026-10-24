@@ -2745,10 +2745,11 @@ jobs:
           if [ -n "${PR:-}" ]; then
             ext_args=(-f external_id="scope-pr-$PR-$WR_RUN_ID-$WR_RUN_ATTEMPT")
           fi
-          # One retry: a single transient 5xx here is what strands the lane,
+          # Retried with backoff: a single transient 5xx here is what strands the lane,
           # because pr-readiness counts a missing run of this name as pending and
           # no event can clear it.
-          for attempt in 1 2; do
+          # 75s of backoff outlasts harden-runner refusing a dropped api.github.com IP for one DNS TTL.
+          for attempt in 1 2 3 4 5; do
             if gh api --method POST "repos/$REPO/check-runs" \
               -f name="Security Scope Review" -f head_sha="$HEAD" \
               -f status="completed" -f conclusion="$CONCLUSION" ${ext_args[@]+"${ext_args[@]}"} \
@@ -2758,7 +2759,7 @@ jobs:
               -f "output[text]=$lane_text" >/dev/null; then
               exit 0
             fi
-            sleep 5
+            if [ "$attempt" -lt 5 ]; then sleep $((5 << (attempt - 1))); fi
           done
           echo "::warning::could not publish the check-run for $HEAD"
 
