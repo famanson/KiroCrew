@@ -219,9 +219,9 @@ class TestModelRegistry:
             == "global.anthropic.claude-opus-4-8[1m]"
         )
         # bare 'opus'/'sonnet' aliases
-        assert mr.to_provider_id("opus", "claude_code") == "global.anthropic.claude-opus-4-8[1m]"
+        assert mr.to_provider_id("opus", "claude_code") == "global.anthropic.claude-opus-5-5[1m]"
         assert (
-            mr.to_provider_id("sonnet", "claude_code") == "global.anthropic.claude-sonnet-4-6[1m]"
+            mr.to_provider_id("sonnet", "claude_code") == "global.anthropic.claude-sonnet-5-5[1m]"
         )
 
     def test_legacy_dotted_ids_do_not_regress_to_flagship(self):
@@ -446,7 +446,7 @@ class TestCorruptRegistryFallback:
                 continue
             keys = [canonical, *entry.get("aliases", [])]
             for k in keys:
-                # An alias two rows list (bare "opus") resolves to the first row.
+                # Map each key through the live index, the path the fallback mirrors.
                 pid = mr._REGISTRY[index[k]]["providers"]["claude_code"]
                 assert k in mr._FALLBACK_PROVIDER_IDS, (
                     f"{k!r} missing from _FALLBACK_PROVIDER_IDS (corrupt-registry "
@@ -782,8 +782,13 @@ class TestAdvertisedModelCache:
             == "fable"
         )
         assert (
-            mr.resolve_wire_model_id("global.anthropic.claude-opus-4-8[1m]", "claude_code")
+            mr.resolve_wire_model_id("global.anthropic.claude-opus-5-5[1m]", "claude_code")
             == "opus"
+        )
+        # Bare "opus" means 5.5, so a stored 4.8 id no longer folds onto it.
+        assert (
+            mr.resolve_wire_model_id("global.anthropic.claude-opus-4-8[1m]", "claude_code")
+            != "opus"
         )
 
     def test_wire_id_never_folds_onto_a_substitution_alias(self, monkeypatch):
