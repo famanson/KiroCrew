@@ -470,6 +470,10 @@ class TestCorruptRegistryFallback:
             == "global.anthropic.claude-opus-4-8[1m]"
         )
 
+    @pytest.mark.parametrize("family", ["opus", "sonnet"])
+    def test_fallback_maps_bare_family_alias_to_the_newest_model(self, family):
+        assert mr._FALLBACK_PROVIDER_IDS[family] == f"global.anthropic.claude-{family}-5-5[1m]"
+
 
 class TestAdvertisedModelCache:
     """The provider-advertised model cache: seed source + wire-id folding.
@@ -936,3 +940,19 @@ class TestClaude55Rows:
     )
     def test_a_kiro_served_row_auto_or_an_unknown_id_does_not_lack_one(self, pin):
         assert mr.lacks_acp_id(pin) is False
+
+
+class TestBareFamilyAliases:
+    @pytest.mark.parametrize("family", ["opus", "sonnet"])
+    def test_bare_alias_resolves_to_the_newest_model_like_claude_code(self, family):
+        assert mr.canonical_key(family) == f"{family}-5.5-1m"
+
+    def test_no_claude_code_alias_belongs_to_two_rows(self):
+        owners: dict[str, list[str]] = {}
+        for key, entry in mr._REGISTRY.items():
+            if entry.get("providers", {}).get("claude_code") is None:
+                continue
+            for alias in entry.get("aliases", []):
+                owners.setdefault(alias, []).append(key)
+        shared = {a: rows for a, rows in owners.items() if len(rows) > 1}
+        assert not shared
