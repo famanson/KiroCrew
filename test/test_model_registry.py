@@ -470,10 +470,6 @@ class TestCorruptRegistryFallback:
             == "global.anthropic.claude-opus-4-8[1m]"
         )
 
-    @pytest.mark.parametrize("family", ["opus", "sonnet"])
-    def test_fallback_maps_bare_family_alias_to_the_newest_model(self, family):
-        assert mr._FALLBACK_PROVIDER_IDS[family] == f"global.anthropic.claude-{family}-5-5[1m]"
-
 
 class TestAdvertisedModelCache:
     """The provider-advertised model cache: seed source + wire-id folding.
@@ -788,8 +784,19 @@ class TestAdvertisedModelCache:
         # Bare "opus" means 5.5, so a stored 4.8 id no longer folds onto it.
         assert (
             mr.resolve_wire_model_id("global.anthropic.claude-opus-4-8[1m]", "claude_code")
-            != "opus"
+            == "global.anthropic.claude-opus-4-8[1m]"
         )
+
+    def test_wire_id_keeps_a_stored_sonnet_4_6_id_when_bare_sonnet_is_5_5(self, monkeypatch):
+        monkeypatch.setattr(
+            mr, "_ADVERTISED_MODELS", {"claude_code": ["default", "opus", "fable", "sonnet"]}
+        )
+        stored = "global.anthropic.claude-sonnet-4-6[1m]"
+        assert mr.resolve_wire_model_id(stored, "claude_code") == stored
+
+    def test_acp_id_correction_maps_bare_family_aliases_to_5_5(self):
+        assert mr.acp_id_correction("opus") == "claude-opus-5.5"
+        assert mr.acp_id_correction("sonnet") == "claude-sonnet-5.5"
 
     def test_wire_id_never_folds_onto_a_substitution_alias(self, monkeypatch):
         # The Sonnet entry lists "claude-haiku-4.5" as an alias because the
